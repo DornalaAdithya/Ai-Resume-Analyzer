@@ -26,8 +26,9 @@ app.use("/common-api", commonRoute);
 connectDB();
 
 //start the server
-app.listen(process.env.PORT, () => {
-  console.log(`App Listening to the port ${process.env.PORT}`);
+const port = process.env.PORT || 5000;
+app.listen(port, () => {
+  console.log(`App Listening to the port ${port}`);
 });
 
 //identifying invalid path

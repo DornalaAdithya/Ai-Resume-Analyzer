@@ -41,6 +41,6 @@ export const verifyToken = async (req, res, next) => {
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({ message: "Invalid token. please login" });
     }
-    //next(err);
+    next(error);
   }
 };

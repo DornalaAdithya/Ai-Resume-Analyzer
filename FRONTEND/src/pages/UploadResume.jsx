@@ -1,3 +1,4 @@
+import React from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import useResumeStore from "../stores/resumeStore";
@@ -6,11 +7,28 @@ const UploadResume = () => {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm();
 
-  const uploadResume = useResumeStore((state) => state.uploadResume);
+  const { uploadResume, loading } = useResumeStore();
   const navigate = useNavigate();
+
+  const selectedFile = watch("resume");
+  const [previewUrl, setPreviewUrl] = React.useState(null);
+
+  React.useEffect(() => {
+    if (selectedFile && selectedFile[0]) {
+      const file = selectedFile[0];
+      if (file.type === "application/pdf") {
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+        return () => URL.revokeObjectURL(url);
+      } else {
+        setPreviewUrl(null);
+      }
+    }
+  }, [selectedFile]);
 
   const onSubmit = (data) => {
     const formData = new FormData();
@@ -83,13 +101,29 @@ const UploadResume = () => {
   `}
         >
           {/* Icon */}
-          <div className="text-2xl mb-2">📄</div>
+          <div className="text-2xl mb-2">{selectedFile && selectedFile[0] ? "✅" : "📄"}</div>
 
           {/* Text */}
-          <p className="text-sm font-medium text-[#1d1d1f]">Choose your resume file</p>
+          <p className="text-sm font-medium text-[#1d1d1f]">
+            {selectedFile && selectedFile[0] ? selectedFile[0].name : "Choose your resume file"}
+          </p>
 
           <p className="text-xs mt-1">PDF, DOC, DOCX</p>
         </label>
+
+        {/* Preview Option */}
+        {previewUrl && (
+          <div className="mb-4 text-center">
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:underline font-medium"
+            >
+              👁️ Preview Selected Resume
+            </a>
+          </div>
+        )}
 
         {errors.resume && <p className="text-xs text-red-500 mb-3">{errors.resume.message}</p>}
 
@@ -97,9 +131,17 @@ const UploadResume = () => {
         <div className="w-full flex justify-center">
           <button
             type="submit"
-            className="w-[40%] py-1.5 bg-blue-600 text-white rounded-2xl text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+            disabled={loading}
+            className="w-[40%] py-1.5 bg-blue-600 text-white rounded-2xl text-sm font-medium hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            Upload
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Uploading...
+              </>
+            ) : (
+              "Upload"
+            )}
           </button>
         </div>
       </form>

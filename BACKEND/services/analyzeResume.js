@@ -11,7 +11,7 @@ export const analyzeResume = async (resumeText, targetRole, jobDescription = "")
 Compare the resume's skills, titles, and technologies directly against the JD.
 
 ---JD START---
-${jobDescription.trim().slice(0, 4000)}
+\${jobDescription.trim().slice(0, 4000)}
 ---JD END---
 
 KEYWORD GAP PENALTY:
@@ -23,35 +23,12 @@ Apply this penalty AFTER computing the rubric total (minimum final score = 0).`
     : `No job description provided. Use strict, widely-accepted industry standards for "${targetRole}".`;
 
   const prompt = `
-You are a STRICT, calibrated ATS scoring engine. Your job is to give REALISTIC scores.
-Most real-world resumes score between 40–70. Only exceptional resumes score above 80.
+You are an expert, HIGHLY CRITICAL ATS scoring engine. Your job is to evaluate this resume and provide a precise, realistic score based ONLY on the rubric provided below. 
+WARNING: LLMs tend to be too generous. You MUST evaluate strictly. Do not award points unless there is EXPLICIT, undeniable evidence in the text. If a requirement is only partially met, award 0 points for that criteria.
 
 Evaluate this resume for the role: "${targetRole}".
 
 ${jdSection}
-
-╔══════════════════════════════════════════════════════════╗
-║         SCORE CALIBRATION ANCHORS (READ FIRST)          ║
-╠══════════════════════════════════════════════════════════╣
-║ 90–100: Perfect resume. All sections, 8+ directly        ║
-║         relevant skills, 3+ quantified achievements,     ║
-║         strong projects with real impact. Rare.          ║
-║                                                          ║
-║ 75–89:  Strong resume. All sections present, 6–7         ║
-║         relevant skills, 1–2 quantified achievements,    ║
-║         good projects. Ready for senior roles.           ║
-║                                                          ║
-║ 55–74:  Average resume. Most sections present, 4–5       ║
-║         relevant skills, vague experience descriptions,  ║
-║         projects lack measurable impact.                 ║
-║                                                          ║
-║ 35–54:  Weak resume. Missing sections, few relevant      ║
-║         skills, no quantified achievements, thin         ║
-║         project descriptions.                            ║
-║                                                          ║
-║ 0–34:   Very weak. Missing critical sections, irrelevant ║
-║         skills, no evidence of technical competence.     ║
-╚══════════════════════════════════════════════════════════╝
 
 ══════════════════════════════════════════════════
 STEP-BY-STEP SCORING RUBRIC  (Start at 0, add up)
@@ -109,8 +86,8 @@ Apply the JD keyword gap penalty now if applicable.
 ══════════════════════════════════════════════════
 ABSOLUTE RULES — VIOLATIONS ARE NOT PERMITTED:
 ══════════════════════════════════════════════════
-1. You MUST follow the calibration anchors. If you give a score above 75, you must be able to justify it with specific evidence from the resume text.
-2. Never award points that are not clearly evidenced in the resume text.
+1. You MUST follow the rubric strictly. Never award points that are not clearly evidenced in the resume text. Be highly critical.
+2. Never assume skills or experience. If it's not explicitly written, it does not exist.
 3. If a criterion says "quantified achievement" and there are NO numbers tied to impact, the +10 is NOT awarded.
 4. The score must be an integer between 0 and 100.
 5. Return ONLY valid JSON — no markdown, no explanation outside the JSON.
@@ -150,7 +127,7 @@ ${resumeText}
         {
           role: "system",
           content:
-            "You are a strict, calibrated ATS scoring engine. You follow a precise point-based rubric. Most resumes score 40–70. You never inflate scores. Return ONLY valid JSON.",
+            "You are a highly critical ATS scoring engine. You evaluate resumes strictly based on a point-based rubric. Calculate the points precisely and objectively. DO NOT inflate scores. Return ONLY valid JSON. The output MUST be a valid JSON object.",
         },
         {
           role: "user",
@@ -158,24 +135,26 @@ ${resumeText}
         },
       ],
       temperature: 0.1,
+      response_format: { type: "json_object" },
     });
 
     const rawText = response.choices[0].message.content;
     console.log("RAW AI RESPONSE:\n", rawText);
 
-    const cleaned = rawText.replace(/```json|```/g, "").trim();
-
-    const extractJSON = (str) => {
-      const start = str.indexOf("{");
-      const end = str.lastIndexOf("}");
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (parseError) {
+      console.log("Initial JSON.parse failed. Attempting fallback extraction...");
+      const cleaned = rawText.replace(/```json|```/g, "").trim();
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
       if (start === -1 || end === -1) throw new Error("No JSON object found in AI response");
-      return JSON.parse(str.slice(start, end + 1));
-    };
-
-    const parsed = extractJSON(cleaned);
+      parsed = JSON.parse(cleaned.slice(start, end + 1));
+    }
 
     // Clamp score to 0–100 just in case
-    parsed.atsScore = Math.min(100, Math.max(0, Math.round(parsed.atsScore)));
+    parsed.atsScore = Math.min(100, Math.max(0, Math.round(parsed.atsScore || 0)));
 
     return parsed;
   } catch (error) {
